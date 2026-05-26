@@ -6,6 +6,7 @@ import pinoHttp from 'pino-http';
 import { AppError, globalErrorHandler } from './errors/AppError';
 import { logger } from './lib/logger';
 import { healthRouter } from './routes/health';
+import { tasksRouter } from './routes/tasks';
 
 export const createApp = (): Express => {
   const app = express();
@@ -24,6 +25,7 @@ export const createApp = (): Express => {
   app.use(pinoHttp({ logger }));
 
   app.use('/health', healthRouter);
+  app.use('/tasks', tasksRouter);
 
   app.use((req: Request, _res: Response, next: NextFunction): void => {
     next(new AppError(`Route ${req.method} ${req.originalUrl} not found`, 404, 'NOT_FOUND'));
