@@ -2,6 +2,7 @@ import pino, { type Logger } from 'pino';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+/* istanbul ignore next -- pretty-transport branch is dev-only and fixed at module load */
 export const logger: Logger = pino({
   level: process.env.LOG_LEVEL ?? 'info',
   redact: {

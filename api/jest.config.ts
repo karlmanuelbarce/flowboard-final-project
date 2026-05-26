@@ -12,6 +12,24 @@ const config: Config = {
   maxWorkers: 1,
   testTimeout: 30_000,
   verbose: true,
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/types/**',
+    // Generated/instantiation-only — covered indirectly by every other test.
+    '!src/lib/prisma.ts',
+    // Entrypoint binds a port and registers signal handlers; exercised by the
+    // running container, not by Jest.
+    '!src/server.ts',
+  ],
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      branches: 80,
+      functions: 80,
+      statements: 80,
+    },
+  },
 };
 
 export default config;

@@ -43,6 +43,16 @@ describe('POST /tasks', () => {
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('FORBIDDEN');
   });
+
+  it('returns 404 when creating a task on a missing board', async () => {
+    const { accessToken } = await registerUser(app);
+    const res = await request(app)
+      .post('/tasks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title: 'No board', boardId: '00000000-0000-4000-8000-000000000000' });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('BOARD_NOT_FOUND');
+  });
 });
 
 describe('GET /tasks/:id', () => {
@@ -163,5 +173,22 @@ describe('DELETE /tasks/:id', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(404);
     expect(res.body.code).toBe('TASK_NOT_FOUND');
+  });
+
+  it('returns 403 when another user tries to delete', async () => {
+    const alice = await registerUser(app);
+    const bob = await registerUser(app);
+    const boardId = await createBoard(app, alice.accessToken);
+    const created = await request(app)
+      .post('/tasks')
+      .set('Authorization', `Bearer ${alice.accessToken}`)
+      .send({ title: 'Alice task', boardId })
+      .expect(201);
+
+    const res = await request(app)
+      .delete(`/tasks/${created.body.data.id}`)
+      .set('Authorization', `Bearer ${bob.accessToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
   });
 });
