@@ -10,12 +10,21 @@ import {
 
 import { AppError } from '../errors/AppError';
 import { prisma } from '../lib/prisma';
-import { signAccessToken, signRefreshToken } from '../lib/jwt';
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from '../lib/jwt';
+import * as refreshStore from '../lib/refreshStore';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
   LoginSchema,
+  LogoutSchema,
+  RefreshSchema,
   RegisterSchema,
   type LoginInput,
+  type LogoutInput,
+  type RefreshInput,
   type RegisterInput,
 } from '../schemas/auth';
 
@@ -39,10 +48,38 @@ const isPrismaUniqueViolation = (err: unknown): err is PrismaKnownError =>
   (err as { name?: unknown }).name === 'PrismaClientKnownRequestError' &&
   (err as { code?: unknown }).code === 'P2002';
 
-const issueTokens = (userId: string): { accessToken: string; refreshToken: string } => ({
-  accessToken: signAccessToken(userId),
-  refreshToken: signRefreshToken(userId, randomUUID()),
-});
+interface IssuedTokens {
+  accessToken: string;
+  refreshToken: string;
+  refreshTokenId: string;
+}
+
+const issueTokens = (userId: string): IssuedTokens => {
+  const refreshTokenId = randomUUID();
+  return {
+    accessToken: signAccessToken(userId),
+    refreshToken: signRefreshToken(userId, refreshTokenId),
+    refreshTokenId,
+  };
+};
+
+const respondWithTokens = async (
+  res: Response,
+  status: 200 | 201,
+  userId: string,
+  user: { id: string; email: string },
+): Promise<void> => {
+  const tokens = issueTokens(userId);
+  await refreshStore.store(userId, tokens.refreshTokenId);
+  res.status(status).json({
+    success: true,
+    data: {
+      user,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    },
+  });
+};
 
 export const register = async (
   req: Request<unknown, unknown, RegisterInput>,
@@ -67,11 +104,7 @@ export const register = async (
       throw err;
     }
 
-    const tokens = issueTokens(user.id);
-    res.status(201).json({
-      success: true,
-      data: { user, ...tokens },
-    });
+    await respondWithTokens(res, 201, user.id, user);
   } catch (err) {
     next(err);
   }
@@ -94,11 +127,74 @@ export const login = async (
       throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
     }
 
-    const tokens = issueTokens(user.id);
+    await respondWithTokens(res, 200, user.id, { id: user.id, email: user.email });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const INVALID_REFRESH_TOKEN = (): AppError =>
+  new AppError('Invalid or expired refresh token', 401, 'INVALID_REFRESH_TOKEN');
+
+export const refresh = async (
+  req: Request<unknown, unknown, RefreshInput>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const input = RefreshSchema.parse(req.body);
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(input.refreshToken);
+    } catch {
+      // Collapse signature / expired / payload-shape into one code to avoid leaking
+      // which path failed. Redis-down errors are NOT caught here — those bubble up
+      // as 500. Failing-open on this path would make stolen refresh tokens replayable
+      // for as long as Redis is down. Day 11+ may add hardening; for now: hard-fail.
+      throw INVALID_REFRESH_TOKEN();
+    }
+
+    const consumed = await refreshStore.consume(payload.sub, payload.jti);
+    if (!consumed) {
+      // Either the token was already used (replay) or never stored. Either way: 401.
+      throw INVALID_REFRESH_TOKEN();
+    }
+
+    const tokens = issueTokens(payload.sub);
+    await refreshStore.store(payload.sub, tokens.refreshTokenId);
+
     res.status(200).json({
       success: true,
-      data: { user: { id: user.id, email: user.email }, ...tokens },
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const logout = async (
+  req: Request<unknown, unknown, LogoutInput>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const input = LogoutSchema.parse(req.body);
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(input.refreshToken);
+    } catch {
+      // Can't identify whose key to delete if the JWT itself is invalid.
+      throw INVALID_REFRESH_TOKEN();
+    }
+
+    // Idempotent: 204 whether the key was present or not.
+    await refreshStore.consume(payload.sub, payload.jti);
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -106,3 +202,5 @@ export const login = async (
 
 authRouter.post('/register', rateLimiter, register);
 authRouter.post('/login', rateLimiter, login);
+authRouter.post('/refresh', refresh);
+authRouter.post('/logout', logout);
