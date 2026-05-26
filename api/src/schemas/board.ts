@@ -1,0 +1,14 @@
+import { z } from 'zod';
+
+export const BoardIdParam = z.object({
+  id: z.string().uuid(),
+});
+
+export const CreateBoardSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+  })
+  .strict();
+
+export type BoardIdParamInput = z.infer<typeof BoardIdParam>;
+export type CreateBoardInput = z.infer<typeof CreateBoardSchema>;
