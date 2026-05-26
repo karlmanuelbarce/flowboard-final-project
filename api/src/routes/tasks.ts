@@ -6,6 +6,7 @@ import {
 } from 'express';
 
 import { AppError } from '../errors/AppError';
+import { publishTaskEvent } from '../lib/events';
 import { prisma } from '../lib/prisma';
 import { requireUser } from '../middleware/authenticate';
 import {
@@ -88,26 +89,16 @@ export const createTask = async (
 
     await assertBoardOwnedByUser(input.boardId, user.id);
 
-    // TODO Day 8: move AuditLog write to worker via Redis Stream.
-    const task = await prisma.$transaction(async (tx) => {
-      const created = await tx.task.create({
-        data: {
-          title: input.title,
-          description: input.description,
-          priority: input.priority,
-          boardId: input.boardId,
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          userId: user.id,
-          action: 'CREATED',
-          entity: 'Task',
-          entityId: created.id,
-        },
-      });
-      return created;
+    const task = await prisma.task.create({
+      data: {
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        boardId: input.boardId,
+      },
     });
+
+    await publishTaskEvent({ action: 'CREATED', entityId: task.id, userId: user.id });
 
     res.status(201).json({ success: true, data: task });
   } catch (err) {
@@ -127,25 +118,15 @@ export const updateTask = async (
 
     await loadOwnedTask(id, user.id);
 
-    // TODO Day 8: move AuditLog write to worker via Redis Stream.
-    const task = await prisma.$transaction(async (tx) => {
-      const updated = await tx.task.update({
-        where: { id },
-        data: {
-          ...(input.title !== undefined ? { title: input.title } : {}),
-          ...(input.priority !== undefined ? { priority: input.priority } : {}),
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          userId: user.id,
-          action: 'UPDATED',
-          entity: 'Task',
-          entityId: updated.id,
-        },
-      });
-      return updated;
+    const task = await prisma.task.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+      },
     });
+
+    await publishTaskEvent({ action: 'UPDATED', entityId: task.id, userId: user.id });
 
     res.status(200).json({ success: true, data: task });
   } catch (err) {
@@ -164,18 +145,9 @@ export const deleteTask = async (
 
     await loadOwnedTask(id, user.id);
 
-    // TODO Day 8: move AuditLog write to worker via Redis Stream.
-    await prisma.$transaction(async (tx) => {
-      await tx.task.delete({ where: { id } });
-      await tx.auditLog.create({
-        data: {
-          userId: user.id,
-          action: 'DELETED',
-          entity: 'Task',
-          entityId: id,
-        },
-      });
-    });
+    await prisma.task.delete({ where: { id } });
+
+    await publishTaskEvent({ action: 'DELETED', entityId: id, userId: user.id });
 
     res.status(204).send();
   } catch (err) {
