@@ -31,3 +31,19 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
   }
   return { sub: (decoded as { sub: string }).sub };
 };
+
+export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
+  const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
+  if (
+    typeof decoded !== 'object' ||
+    decoded === null ||
+    typeof (decoded as { sub?: unknown }).sub !== 'string' ||
+    typeof (decoded as { jti?: unknown }).jti !== 'string'
+  ) {
+    throw new Error('Invalid refresh token payload');
+  }
+  return {
+    sub: (decoded as { sub: string }).sub,
+    jti: (decoded as { jti: string }).jti,
+  };
+};
