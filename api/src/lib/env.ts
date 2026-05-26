@@ -23,6 +23,7 @@ export type Env = z.infer<typeof EnvSchema>;
 
 const parsed = EnvSchema.safeParse(process.env);
 
+/* istanbul ignore if -- module-init guard; only fires when env is missing at boot */
 if (!parsed.success) {
   logger.fatal(
     { errors: parsed.error.flatten().fieldErrors },

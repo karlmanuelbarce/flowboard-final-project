@@ -13,10 +13,12 @@ export const redis: Redis = new Redis(env.REDIS_URL, {
   lazyConnect: false,
 });
 
+/* istanbul ignore next -- event handlers fire on transport-level events, not via test calls */
 redis.on('error', (err: Error): void => {
   logger.error({ err: { message: err.message, name: err.name } }, 'redis error');
 });
 
+/* istanbul ignore next -- event handlers fire on transport-level events, not via test calls */
 redis.on('connect', (): void => {
   logger.info('redis connected');
 });

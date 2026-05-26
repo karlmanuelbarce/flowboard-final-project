@@ -119,6 +119,31 @@ describe('DELETE /boards/:id', () => {
       .expect(404);
   });
 
+  it('returns 404 when the board does not exist', async () => {
+    const { accessToken } = await registerUser(app);
+    const res = await request(app)
+      .delete('/boards/00000000-0000-4000-8000-000000000000')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('BOARD_NOT_FOUND');
+  });
+
+  it('returns 403 when another user tries to delete', async () => {
+    const alice = await registerUser(app);
+    const bob = await registerUser(app);
+    const create = await request(app)
+      .post('/boards')
+      .set('Authorization', `Bearer ${alice.accessToken}`)
+      .send({ name: 'Alice only' })
+      .expect(201);
+
+    const res = await request(app)
+      .delete(`/boards/${create.body.data.id}`)
+      .set('Authorization', `Bearer ${bob.accessToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
   it('returns 409 when the board still has tasks', async () => {
     const { accessToken } = await registerUser(app);
     const board = await request(app)
