@@ -6,7 +6,7 @@ import {
 } from 'express';
 
 import { AppError } from '../errors/AppError';
-import { taskRepository } from '../lib/taskRepository';
+import { prisma } from '../lib/prisma';
 import {
   CreateTaskSchema,
   TaskIdParam,
@@ -25,7 +25,7 @@ export const getTask = async (
 ): Promise<void> => {
   try {
     const { id } = TaskIdParam.parse(req.params);
-    const task = taskRepository.findById(id);
+    const task = await prisma.task.findUnique({ where: { id } });
     if (!task) {
       throw new AppError('Task not found', 404, 'TASK_NOT_FOUND');
     }
@@ -42,11 +42,13 @@ export const createTask = async (
 ): Promise<void> => {
   try {
     const input = CreateTaskSchema.parse(req.body);
-    const task = taskRepository.create({
-      title: input.title,
-      description: input.description,
-      priority: input.priority,
-      boardId: input.boardId,
+    const task = await prisma.task.create({
+      data: {
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        boardId: input.boardId,
+      },
     });
     res.status(201).json({ success: true, data: task });
   } catch (err) {
@@ -62,13 +64,13 @@ export const updateTask = async (
   try {
     const { id } = TaskIdParam.parse(req.params);
     const input = UpdateTaskSchema.parse(req.body);
-    const task = taskRepository.update(id, {
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...(input.priority !== undefined ? { priority: input.priority } : {}),
+    const task = await prisma.task.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+      },
     });
-    if (!task) {
-      throw new AppError('Task not found', 404, 'TASK_NOT_FOUND');
-    }
     res.status(200).json({ success: true, data: task });
   } catch (err) {
     next(err);
@@ -82,10 +84,7 @@ export const deleteTask = async (
 ): Promise<void> => {
   try {
     const { id } = TaskIdParam.parse(req.params);
-    const removed = taskRepository.delete(id);
-    if (!removed) {
-      throw new AppError('Task not found', 404, 'TASK_NOT_FOUND');
-    }
+    await prisma.task.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
     next(err);
