@@ -11,6 +11,7 @@ import {
 import { AppError } from '../errors/AppError';
 import { prisma } from '../lib/prisma';
 import { signAccessToken, signRefreshToken } from '../lib/jwt';
+import { rateLimiter } from '../middleware/rateLimiter';
 import {
   LoginSchema,
   RegisterSchema,
@@ -103,5 +104,5 @@ export const login = async (
   }
 };
 
-authRouter.post('/register', register);
-authRouter.post('/login', login);
+authRouter.post('/register', rateLimiter, register);
+authRouter.post('/login', rateLimiter, login);
