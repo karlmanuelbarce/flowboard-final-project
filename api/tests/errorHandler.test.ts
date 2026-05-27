@@ -126,6 +126,23 @@ describe('globalErrorHandler', () => {
       const res = await request(buildErrorApp(new Error('unexpected'))).get('/boom');
       expect(res.status).toBe(500);
       expect(res.body.stack).toBeUndefined();
+      expect(Object.keys(res.body).sort()).toEqual(['code', 'message', 'success']);
+    } finally {
+      process.env.NODE_ENV = original;
+    }
+  });
+
+  it('does NOT include ZodError details when NODE_ENV=production', async () => {
+    const original = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const result = z.object({ x: z.number() }).safeParse({ x: 'no' });
+      if (result.success) throw new Error('Expected Zod parse to fail');
+      const res = await request(buildErrorApp(result.error)).get('/boom');
+      expect(res.status).toBe(422);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(res.body.details).toBeUndefined();
+      expect(Object.keys(res.body).sort()).toEqual(['code', 'message', 'success']);
     } finally {
       process.env.NODE_ENV = original;
     }

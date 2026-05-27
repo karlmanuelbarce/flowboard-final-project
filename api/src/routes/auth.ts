@@ -9,12 +9,13 @@ import {
 } from 'express';
 
 import { AppError } from '../errors/AppError';
-import { prisma } from '../lib/prisma';
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
 } from '../lib/jwt';
+import * as loginThrottle from '../lib/loginThrottle';
+import { prisma } from '../lib/prisma';
 import * as refreshStore from '../lib/refreshStore';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
@@ -118,14 +119,26 @@ export const login = async (
   try {
     const input = LoginSchema.parse(req.body);
     const email = input.email.toLowerCase();
+    const ip = req.ip ?? 'unknown';
+    const attemptId = { email, ip };
+
+    // Brute-force gate runs BEFORE bcrypt to short-circuit cheap attempts.
+    // assertNotLocked is fail-open on Redis errors (see loginThrottle.ts).
+    await loginThrottle.assertNotLocked(attemptId);
 
     const user = await prisma.user.findUnique({ where: { email } });
     const hashToCompare = user?.password ?? DUMMY_HASH;
     const ok = await bcrypt.compare(input.password, hashToCompare);
 
     if (!user || !ok) {
+      // Bump counters BEFORE throwing so the very next attempt sees the new count.
+      await loginThrottle.registerFailedLogin(attemptId);
       throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
     }
+
+    // Clear both counters on success so a user who fumbled then succeeded is
+    // not locked out on their next legitimate attempt.
+    await loginThrottle.clearLoginFailures(attemptId);
 
     await respondWithTokens(res, 200, user.id, { id: user.id, email: user.email });
   } catch (err) {
