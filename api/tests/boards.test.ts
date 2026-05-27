@@ -73,7 +73,7 @@ describe('GET /boards/:id', () => {
     expect(res.body.data.id).toBe(create.body.data.id);
   });
 
-  it('returns 403 when another user requests it', async () => {
+  it('returns 404 (not 403) when another user requests it — read-leak policy', async () => {
     const alice = await registerUser(app);
     const bob = await registerUser(app);
     const create = await request(app)
@@ -85,8 +85,8 @@ describe('GET /boards/:id', () => {
     const res = await request(app)
       .get(`/boards/${create.body.data.id}`)
       .set('Authorization', `Bearer ${bob.accessToken}`);
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('FORBIDDEN');
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('BOARD_NOT_FOUND');
   });
 
   it('returns 404 for an unknown board', async () => {

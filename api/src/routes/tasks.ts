@@ -65,11 +65,11 @@ export const getTask = async (
       where: { id },
       include: { board: { select: { ownerId: true } } },
     });
-    if (!task) {
+    // Read-mismatch policy: collapse "exists but not yours" into 404 so an
+    // attacker cannot enumerate task IDs. Writes keep 403.
+    // See ai-context.md "Authorization Leak Policy".
+    if (!task || task.board.ownerId !== user.id) {
       throw new AppError('Task not found', 404, 'TASK_NOT_FOUND');
-    }
-    if (task.board.ownerId !== user.id) {
-      throw new AppError('Forbidden', 403, 'FORBIDDEN');
     }
     const { board: _board, ...taskData } = task;
     res.status(200).json({ success: true, data: taskData });

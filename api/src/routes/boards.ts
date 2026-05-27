@@ -63,11 +63,11 @@ export const getBoard = async (
     const user = requireUser(req);
     const { id } = BoardIdParam.parse(req.params);
     const board = await prisma.board.findUnique({ where: { id } });
-    if (!board) {
+    // Read-mismatch policy: collapse "exists but not yours" into the same 404
+    // shape as "does not exist" so an attacker cannot enumerate board IDs.
+    // Writes (PATCH/DELETE) keep 403 — see ai-context.md "Authorization Leak Policy".
+    if (!board || board.ownerId !== user.id) {
       throw new AppError('Board not found', 404, 'BOARD_NOT_FOUND');
-    }
-    if (board.ownerId !== user.id) {
-      throw new AppError('Forbidden', 403, 'FORBIDDEN');
     }
     res.status(200).json({ success: true, data: board });
   } catch (err) {

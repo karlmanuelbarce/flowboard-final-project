@@ -88,6 +88,23 @@ describe('GET /tasks/:id', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(422);
   });
+
+  it('returns 404 (not 403) when another user requests it — read-leak policy', async () => {
+    const alice = await registerUser(app);
+    const bob = await registerUser(app);
+    const boardId = await createBoard(app, alice.accessToken);
+    const created = await request(app)
+      .post('/tasks')
+      .set('Authorization', `Bearer ${alice.accessToken}`)
+      .send({ title: 'Alice task', boardId })
+      .expect(201);
+
+    const res = await request(app)
+      .get(`/tasks/${created.body.data.id}`)
+      .set('Authorization', `Bearer ${bob.accessToken}`);
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('TASK_NOT_FOUND');
+  });
 });
 
 describe('PATCH /tasks/:id', () => {

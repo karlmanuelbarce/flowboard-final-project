@@ -120,6 +120,17 @@ Standard error codes (non-exhaustive): `TASK_NOT_FOUND`, `BOARD_NOT_FOUND`, `UNA
 - The `authenticate` middleware verifies the JWT and attaches `req.user`. It does **not** hit Redis or the DB — the JWT is self-contained.
 - Every route handler that touches a board or task enforces ownership: `resource.ownerId === req.user.id`, else 403.
 
+### Authorization Leak Policy
+
+To avoid leaking which resource IDs exist, ownership mismatches are split by intent:
+
+| Method | Mismatch response | Rationale |
+| :-- | :-- | :-- |
+| `GET /boards/:id`, `GET /tasks/:id` | **404** with the same `*_NOT_FOUND` code used for true non-existence | Prevents ID enumeration via GET |
+| `PATCH /boards/:id`, `PATCH /tasks/:id`, `DELETE /...` | **403 FORBIDDEN** | The caller has stated the resource ID; clarity on auth failure is more useful than concealment |
+
+Tests `boards.test.ts` and `tasks.test.ts` enforce this split. Keep the wording of the 404 response identical to the genuine "not found" path.
+
 ### Redis Keys
 
 | Purpose | Key Pattern | TTL |
