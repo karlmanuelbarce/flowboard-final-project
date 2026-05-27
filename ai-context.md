@@ -156,6 +156,29 @@ Consumer group for the Worker: `audit-group`. Consumer name: `worker-1`.
 - On success: write `AuditLog` row, then `XACK` the message.
 - On failure: retry up to 3 times. After the 3rd failure, move the message to `tasks:events:dlq` and `XACK` the original so it does not loop forever.
 
+### Dead-Letter Queue
+
+Stream key: `tasks:events:dlq`
+
+Per-entry fields (matches `worker/src/index.ts`):
+
+| Field | Source |
+| :-- | :-- |
+| `action` | `CREATED` \| `UPDATED` \| `DELETED` (from the original event) |
+| `entity` | `Task` |
+| `entityId` | UUID of the task |
+| `userId` | UUID of the actor |
+| `occurredAt` | ISO 8601 timestamp set when the event was published |
+| `errorMessage` | `.message` of the final retry error |
+| `failedAt` | ISO 8601 timestamp set when the DLQ move happened |
+
+Move policy: 3 retry attempts in the same worker process with delays `100ms / 500ms / 2000ms`. On the third failure, the original event fields plus `errorMessage` and `failedAt` are `XADD`'d to `tasks:events:dlq`, then the original message is `XACK`'d on the main stream so it does not loop in the Pending Entries List.
+
+Inspection:
+- List entries: `redis-cli XRANGE tasks:events:dlq - + COUNT 50`
+- Count: `redis-cli XLEN tasks:events:dlq`
+- Clear (manual): `redis-cli DEL tasks:events:dlq`
+
 ### Security Middleware Stack (order matters)
 
 In `app.ts`, before any routes:
