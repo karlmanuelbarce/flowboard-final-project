@@ -10,7 +10,7 @@ import { logger } from './lib/logger';
 import { authenticate } from './middleware/authenticate';
 import { authRouter } from './routes/auth';
 import { boardsRouter } from './routes/boards';
-import { healthRouter } from './routes/health';
+import { healthRouter, readyRouter } from './routes/health';
 import { tasksRouter } from './routes/tasks';
 
 export const createApp = (): Express => {
@@ -51,6 +51,7 @@ export const createApp = (): Express => {
 
   // Public.
   app.use('/health', healthRouter);
+  app.use('/ready', readyRouter);
   app.use('/auth', authRouter);
 
   // Protected.
