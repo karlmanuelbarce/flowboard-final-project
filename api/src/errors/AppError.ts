@@ -59,6 +59,21 @@ export const globalErrorHandler: ErrorRequestHandler = (
     return;
   }
 
+  // body-parser throws an Error subclass with `type: 'entity.too.large'` when
+  // the body exceeds the configured limit. Translate it into our standard
+  // envelope before any other branch claims it.
+  if (
+    typeof err === 'object' &&
+    (err as { type?: unknown }).type === 'entity.too.large'
+  ) {
+    res.status(413).json({
+      success: false,
+      message: 'Request body exceeds the size limit',
+      code: 'PAYLOAD_TOO_LARGE',
+    } satisfies ErrorBody);
+    return;
+  }
+
   if (isAppError(err)) {
     res.status(err.statusCode).json({
       success: false,
