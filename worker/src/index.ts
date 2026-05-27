@@ -137,7 +137,12 @@ const shutdown = async (signal: string): Promise<void> => {
   logger.info({ signal }, 'worker shutting down');
   stopping = true;
   // Give the loop up to BLOCK_MS to exit its current XREADGROUP, then close.
-  setTimeout(() => process.exit(0), BLOCK_MS + 1000).unref();
+  setTimeout(() => {
+    // Flush the last buffered log lines (DLQ moves, retry warnings) before
+    // the process is killed. Pino buffers async writes in production.
+    logger.flush();
+    process.exit(0);
+  }, BLOCK_MS + 1000).unref();
   try {
     await prisma.$disconnect();
     redis.disconnect();
