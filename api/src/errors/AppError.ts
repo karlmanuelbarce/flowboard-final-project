@@ -84,12 +84,18 @@ export const globalErrorHandler: ErrorRequestHandler = (
   }
 
   if (err instanceof ZodError) {
-    res.status(422).json({
+    const body: ErrorBody = {
       success: false,
       message: 'Validation failed',
       code: 'VALIDATION_ERROR',
-      details: err.flatten().fieldErrors,
-    } satisfies ErrorBody);
+    };
+    // Field-level details help debugging in non-prod; in production we keep
+    // the envelope minimal ({ success, message, code }) to avoid leaking
+    // schema internals to clients (and to match the Day 12 spec).
+    if (process.env.NODE_ENV !== 'production') {
+      body.details = err.flatten().fieldErrors;
+    }
+    res.status(422).json(body);
     return;
   }
 

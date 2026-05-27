@@ -44,6 +44,18 @@ describe('POST /tasks', () => {
     expect(res.body.code).toBe('FORBIDDEN');
   });
 
+  it('rejects unknown fields with 422 (mass-assignment guard)', async () => {
+    const { accessToken } = await registerUser(app);
+    const boardId = await createBoard(app, accessToken);
+
+    const res = await request(app)
+      .post('/tasks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title: 'Sneaky', boardId, isAdmin: true, createdAt: '1970-01-01' });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
   it('returns 404 when creating a task on a missing board', async () => {
     const { accessToken } = await registerUser(app);
     const res = await request(app)
