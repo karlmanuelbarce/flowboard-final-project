@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
+import type { Level } from 'pino';
 import pinoHttp from 'pino-http';
 
 import { AppError, globalErrorHandler } from './errors/AppError';
@@ -26,7 +27,27 @@ export const createApp = (): Express => {
     }),
   );
   app.use(express.json({ limit: '10kb' }));
-  app.use(pinoHttp({ logger }));
+  app.use(
+    pinoHttp({
+      logger,
+      // 5xx → error, 4xx → warn, else info. Keeps prod log volume meaningful.
+      customLogLevel: (_req, res, err): Level => {
+        if (err || res.statusCode >= 500) return 'error';
+        if (res.statusCode >= 400) return 'warn';
+        return 'info';
+      },
+      // Whitelist req/res fields so the full body (which can hold passwords or
+      // refresh tokens) never reaches the log even if redact paths drift.
+      serializers: {
+        req: (req: { method: string; url: string; id: string }) => ({
+          method: req.method,
+          url: req.url,
+          id: req.id,
+        }),
+        res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+      },
+    }),
+  );
 
   // Public.
   app.use('/health', healthRouter);
