@@ -1,0 +1,25 @@
+meta {
+  name: Delete Task
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/tasks/{{taskId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Wrong-owner write → 403 FORBIDDEN. Unknown id → 404 TASK_NOT_FOUND. Publishes DELETED event to `tasks:events`.
+}

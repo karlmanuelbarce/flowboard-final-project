@@ -1,0 +1,34 @@
+meta {
+  name: Update Task
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/tasks/{{taskId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "Renamed task",
+    "priority": "HIGH"
+  }
+}
+
+tests {
+  test("returns 200 with the updated task", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.title).to.equal("Renamed task");
+    expect(res.getBody().data.priority).to.equal("HIGH");
+  });
+}
+
+docs {
+  UpdateTaskSchema.strict() with .refine(): at least one of {title, priority} required. Empty body → 422. Wrong-owner write → 403 FORBIDDEN. Publishes UPDATED event on success.
+}

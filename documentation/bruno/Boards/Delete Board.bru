@@ -1,0 +1,25 @@
+meta {
+  name: Delete Board
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/boards/{{boardId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns 204 when the board is empty (or 409 if it still has tasks)", function() {
+    expect([204, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Block-on-children: refuses to delete a board that still has tasks (409 BOARD_HAS_TASKS) to preserve the audit trail. Wrong-owner write → 403 FORBIDDEN.
+}

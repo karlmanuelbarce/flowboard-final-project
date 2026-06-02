@@ -1,0 +1,42 @@
+meta {
+  name: Create Task
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/tasks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "Do the thing",
+    "description": "Optional description",
+    "priority": "MEDIUM",
+    "boardId": "{{boardId}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body && res.body.data) {
+    bru.setEnvVar("taskId", res.body.data.id);
+  }
+}
+
+tests {
+  test("returns 201 with the new task linked to the board", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.title).to.equal("Do the thing");
+    expect(res.getBody().data.boardId).to.equal(bru.getEnvVar("boardId"));
+  });
+}
+
+docs {
+  CreateTaskSchema.strict(): title 1–255, description ≤ 2000 (optional), priority ∈ {LOW,MEDIUM,HIGH} (default MEDIUM), boardId uuid. Board ownership enforced — POST to someone else's board → 403. Missing board → 404. After commit, publishes a `tasks:events` stream entry consumed by the worker → AuditLog row.
+}

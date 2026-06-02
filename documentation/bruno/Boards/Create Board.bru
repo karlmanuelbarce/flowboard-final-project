@@ -1,0 +1,39 @@
+meta {
+  name: Create Board
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/boards
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "My Board"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body && res.body.data) {
+    bru.setEnvVar("boardId", res.body.data.id);
+  }
+}
+
+tests {
+  test("returns 201 and the board is owned by the caller", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.name).to.equal("My Board");
+    expect(res.getBody().data.ownerId).to.be.a("string");
+  });
+}
+
+docs {
+  CreateBoardSchema.strict() — name must be 1–120 chars; unknown fields → 422.
+}

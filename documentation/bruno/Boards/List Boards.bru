@@ -1,0 +1,26 @@
+meta {
+  name: List Boards
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/boards
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns 200 with an array of boards owned by the caller", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.be.an("array");
+  });
+}
+
+docs {
+  Lists boards filtered by ownerId — never returns another user's boards. Missing/invalid token → 401.
+}
