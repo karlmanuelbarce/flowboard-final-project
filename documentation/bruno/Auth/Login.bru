@@ -1,0 +1,37 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{email}}",
+    "password": "{{password}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body && res.body.data) {
+    bru.setEnvVar("accessToken", res.body.data.accessToken);
+    bru.setEnvVar("refreshToken", res.body.data.refreshToken);
+  }
+}
+
+tests {
+  test("returns 200 with token pair", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.accessToken).to.be.a("string");
+    expect(res.getBody().data.refreshToken).to.be.a("string");
+  });
+}
+
+docs {
+  Returns a fresh token pair on valid credentials. Wrong password OR unknown email → 401 INVALID_CREDENTIALS (no distinction, to prevent enumeration). 10 failed attempts in 60s → 429 LOGIN_LOCKED. 100 requests / 15 min globally → 429 RATE_LIMIT_EXCEEDED.
+}

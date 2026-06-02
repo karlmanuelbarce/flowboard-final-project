@@ -1,0 +1,36 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{email}}",
+    "password": "{{password}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body && res.body.data) {
+    bru.setEnvVar("accessToken", res.body.data.accessToken);
+    bru.setEnvVar("refreshToken", res.body.data.refreshToken);
+  }
+}
+
+tests {
+  test("returns 201 with token pair (or 409 if email already taken)", function() {
+    expect([201, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Registers a new user with bcrypt-hashed password (cost 12). Returns access (15m) + refresh (7d) tokens.
+  Duplicate email → 409 EMAIL_TAKEN. Invalid body (email format / password < 12 chars) → 422.
+}

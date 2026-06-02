@@ -1,0 +1,27 @@
+meta {
+  name: Logout
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+tests {
+  test("returns 204 (idempotent)", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Deletes the refresh token key from Redis. Idempotent for a valid JWT — 204 whether the key was present or not. Invalid JWT → 401.
+}

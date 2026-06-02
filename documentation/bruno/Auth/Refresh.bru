@@ -1,0 +1,36 @@
+meta {
+  name: Refresh
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body && res.body.data) {
+    bru.setEnvVar("accessToken", res.body.data.accessToken);
+    bru.setEnvVar("refreshToken", res.body.data.refreshToken);
+  }
+}
+
+tests {
+  test("returns 200 with a new pair (refreshToken rotates)", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.accessToken).to.be.a("string");
+    expect(res.getBody().data.refreshToken).to.be.a("string");
+  });
+}
+
+docs {
+  Token rotation: the old refresh token is atomically deleted from Redis and a new pair is issued. Re-sending the original token after rotation → 401 INVALID_REFRESH_TOKEN (replay protection).
+}

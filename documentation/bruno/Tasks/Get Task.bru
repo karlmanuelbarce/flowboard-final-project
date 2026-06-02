@@ -1,0 +1,26 @@
+meta {
+  name: Get Task
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/tasks/{{taskId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns 200 for the owner", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getEnvVar("taskId"));
+  });
+}
+
+docs {
+  Path id validated as UUID (non-uuid → 422). Unknown id OR another user's task → 404 TASK_NOT_FOUND (read-leak policy).
+}
